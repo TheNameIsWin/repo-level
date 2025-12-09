@@ -1,0 +1,21 @@
+name: Android Test
+
+on:
+  pull_request:
+    paths:
+      - '**/android/**'  # Only if Android files changed
+
+jobs:
+  test-android:
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.changed_files, 'android/')  # Extra condition
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Run Unit Tests
+        run: cd android && ./gradlew test  # Fail if tests fail

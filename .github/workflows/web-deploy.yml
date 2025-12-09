@@ -1,0 +1,22 @@
+name: Web Deploy
+
+on:
+  pull_request:
+    paths:
+      - '**/web/**'  # Only if Web files changed
+
+jobs:
+  deploy-web:
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.changed_files, 'web/')  # Extra condition
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: cd web && npm ci
+      - name: Run Linting & Tests
+        run: cd web && npm run lint && npm test  # Fail on lint/test errors
