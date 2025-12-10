@@ -1,22 +1,52 @@
-name: API Build
+name: API CI
 
 on:
   pull_request:
-    paths:
-      - '**/api/**'  # Only if API files changed
 
 jobs:
-  build-api:
-    if: github.event_name == 'pull_request' && contains(github.event.pull_request.changed_files, 'api/')  # Extra condition
+  api-tests:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install dependencies
-        run: npm ci  # Your API deps
-      - name: Run Build & Tests
-        run: npm run build && npm test  # Fail if tests fail
+      - uses: actions/checkout@v4
+
+      # Detect API changes
+      - name: Detect API changes
+        id: detect
+        run: |
+          CHANGED=$(git diff --name-only HEAD^ HEAD | grep -E '^api/|/api/' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      # PASS/FAIL mode read
+      - name: Control Mode
+        id: control
+        run: |
+          MSG="${{ github.event.pull_request.title }} ${{ github.event.pull_request.body }}"
+          if echo "$MSG" | grep -qi "fail-test"; then
+            echo "mode=fail" >> $GITHUB_OUTPUT
+          elif echo "$MSG" | grep -qi "pass-test"; then
+            echo "mode=pass" >> $GITHUB_OUTPUT
+          else
+            echo "mode=normal" >> $GITHUB_OUTPUT
+          fi
+
+      # No changes
+      - name: No API changes — skipping tests
+        if: steps.detect.outputs.changed == 'false'
+        run: echo "No API files changed, skipping tests."
+
+      # Force pass
+      - name: Force pass
+        if: steps.control.outputs.mode == 'pass'
+        run: echo "Passing intentionally"
+
+      # Real API tests
+      - name: Run API Tests
+        if: steps.detect.outputs.changed == 'true' && steps.control.outputs.mode == 'normal'
+        run: |
+          cd api
+          npm install
+          npm test

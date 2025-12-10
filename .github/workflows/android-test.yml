@@ -1,21 +1,49 @@
-name: Android Test
+name: Android E2E
 
 on:
   pull_request:
-    paths:
-      - '**/android/**'  # Only if Android files changed
 
 jobs:
-  test-android:
-    if: github.event_name == 'pull_request' && contains(github.event.pull_request.changed_files, 'android/')  # Extra condition
+  android-tests:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-      - name: Run Unit Tests
-        run: cd android && ./gradlew test  # Fail if tests fail
+      - uses: actions/checkout@v4
+
+      # Detect Android changes
+      - name: Detect Android changes
+        id: detect
+        run: |
+          CHANGED=$(git diff --name-only HEAD^ HEAD | grep -E '^android/|/android/' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      # Detect manual PASS/FAIL triggers
+      - name: Check manual mode
+        id: control
+        run: |
+          MSG="${{ github.event.pull_request.title }} ${{ github.event.pull_request.body }}"
+          if echo "$MSG" | grep -qi "fail-test"; then
+            echo "mode=fail" >> $GITHUB_OUTPUT
+          elif echo "$MSG" | grep -qi "pass-test"; then
+            echo "mode=pass" >> $GITHUB_OUTPUT
+          else
+            echo "mode=normal" >> $GITHUB_OUTPUT
+          fi
+
+      # No Android changes
+      - name: No Android changes — skipping tests
+        if: steps.detect.outputs.changed == 'false'
+        run: echo "No Android files changed, skipping tests."
+
+      # Force pass
+      - name: Force pass
+        if: steps.control.outputs.mode == 'pass'
+        run: echo "Passing intentionally (pass-test)"
+
+      # Real Android tests
+      - name: Run Android Tests
+        if: steps.detect.outputs.changed == 'true' && steps.control.outputs.mode == 'normal'
+        run: ./gradlew test

@@ -23,7 +23,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // Simple test method - Call in XCTest
     func testAddition() -> Bool {
         let sum = 1 + 1
-        return sum == 2  // PASS
-        // return sum == 3  // Uncomment for FAIL
+        // return sum == 2  // PASS
+        return sum == 33  // FAIL
     }
 }
