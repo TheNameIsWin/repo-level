@@ -7,10 +7,9 @@ jobs:
   ios-tests:
     runs-on: macos-latest
     steps:
-      # 1. Checkout
       - uses: actions/checkout@v4
 
-      # 2. Detect changes manually (NO SKIP!)
+      # Detect iOS changes
       - name: Detect iOS changes
         id: detect
         run: |
@@ -21,14 +20,41 @@ jobs:
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
 
-      # 3. If no changes → do not run test, just PASS
+      # *** MANUAL FAIL/PASS CONTROL ***
+      - name: Check for manual fail or pass trigger
+        id: control
+        run: |
+          MSG="${{ github.event.pull_request.title }} ${{ github.event.pull_request.body }}"
+          
+          if echo "$MSG" | grep -qi "fail-test"; then
+            echo "mode=fail" >> $GITHUB_OUTPUT
+          elif echo "$MSG" | grep -qi "pass-test"; then
+            echo "mode=pass" >> $GITHUB_OUTPUT
+          else
+            echo "mode=normal" >> $GITHUB_OUTPUT
+          fi
+
+      # If no iOS changes → PASS
       - name: No iOS changes found — skipping tests
         if: steps.detect.outputs.changed == 'false'
         run: echo "No iOS files changed, skipping tests."
 
-      # 4. RUN TEST ONLY WHEN CHANGED
+      # If fail-test trigger is present → FORCE FAIL
+      - name: Force failure for testing
+        if: steps.control.outputs.mode == 'fail'
+        run: |
+          echo "Failing intentionally (fail-test trigger found)"
+          exit 1
+
+      # If pass-test trigger is present → FORCE PASS
+      - name: Force pass for testing
+        if: steps.control.outputs.mode == 'pass'
+        run: |
+          echo "Passing intentionally (pass-test trigger found)"
+
+      # Normal iOS Tests
       - name: Run iOS Tests
-        if: steps.detect.outputs.changed == 'true'
+        if: steps.detect.outputs.changed == 'true' && steps.control.outputs.mode == 'normal'
         run: |
           cd ios
           xcodebuild test \
