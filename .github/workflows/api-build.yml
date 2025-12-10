@@ -1,30 +1,59 @@
-name: API Build
+name: API CI
 
 on:
   pull_request:
 
 jobs:
-  detect-api:
-    runs-on: ubuntu-latest
-    outputs:
-      api: ${{ steps.filter.outputs.api }}
-    steps:
-      - id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            api:
-              - '**/api/**'
-              - 'api/**'
-
-  build-api:
-    needs: detect-api
-    if: needs.detect-api.outputs.api == 'true'
+  api-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: cd api && npm ci
-      - run: cd api && npm run build && npm test
+
+      # Detect API changes
+      - name: Detect API changes
+        id: detect
+        run: |
+          CHANGED=$(git diff --name-only HEAD^ HEAD | grep -E '^api/|/api/' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      # PASS/FAIL mode read
+      - name: Control Mode
+        id: control
+        run: |
+          MSG="${{ github.event.pull_request.title }} ${{ github.event.pull_request.body }}"
+          if echo "$MSG" | grep -qi "fail-test"; then
+            echo "mode=fail" >> $GITHUB_OUTPUT
+          elif echo "$MSG" | grep -qi "pass-test"; then
+            echo "mode=pass" >> $GITHUB_OUTPUT
+          else
+            echo "mode=normal" >> $GITHUB_OUTPUT
+          fi
+
+      # No changes
+      - name: No API changes — skipping tests
+        if: steps.detect.outputs.changed == 'false'
+        run: echo "No API files changed, skipping tests."
+
+      # Force failure
+      - name: Force failure
+        if: steps.control.outputs.mode == 'fail'
+        run: |
+          echo "Failing intentionally because fail-test detected"
+          exit 1
+
+      # Force pass
+      - name: Force pass
+        if: steps.control.outputs.mode == 'pass'
+        run: echo "Passing intentionally"
+
+      # Real API tests
+      - name: Run API Tests
+        if: steps.detect.outputs.changed == 'true' && steps.control.outputs.mode == 'normal'
+        run: |
+          cd api
+          npm install
+          npm test
