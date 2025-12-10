@@ -9,10 +9,6 @@ jobs:
     outputs:
       web: ${{ steps.filter.outputs.web }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - id: filter
         uses: dorny/paths-filter@v3
         with:
@@ -27,18 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - name: Install Web dependencies
-        run: |
-          cd web
-          npm ci
-
-      - name: Lint & Test Web
-        run: |
-          cd web
-          npm run lint
-          npm test
+      - run: cd web && npm ci
+      - run: cd web && npm run lint && npm test
