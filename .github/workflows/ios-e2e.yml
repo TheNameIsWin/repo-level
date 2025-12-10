@@ -24,7 +24,6 @@ jobs:
       - name: Check for manual fail or pass trigger
         id: control
         run: |
-          cat testomi.yaml
           MSG="${{ github.event.pull_request.title }} ${{ github.event.pull_request.body }}"
           
           if echo "$MSG" | grep -qi "fail-test"; then
