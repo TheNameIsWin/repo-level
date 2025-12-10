@@ -5,7 +5,7 @@ on:
 
 jobs:
   detect-ios:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest 
     outputs:
       ios: ${{ steps.filter.outputs.ios }}
     steps:
