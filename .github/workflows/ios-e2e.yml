@@ -41,7 +41,7 @@ jobs:
 
       # If fail-test trigger is present → FORCE FAIL
       - name: Force failure for testing
-        if: steps.control.outputs.mode == 'failllllll'
+        if: steps.control.outputs.mode == 'fail'
         run: |
           echo "Failing intentionally (fail-test trigger found)"
           exit 1
