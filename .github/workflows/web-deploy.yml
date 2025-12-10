@@ -37,14 +37,7 @@ jobs:
       - name: No Web changes — skipping tests
         if: steps.detect.outputs.changed == 'false'
         run: echo "No Web files changed, skipping tests."
-
-      # Force fail
-      - name: Force failure
-        if: steps.control.outputs.mode == 'fail'
-        run: |
-          echo "Forced failure due to fail-test"
-          exit 1
-
+        
       # Force pass
       - name: Force pass
         if: steps.control.outputs.mode == 'pass'
