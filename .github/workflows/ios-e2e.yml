@@ -2,19 +2,28 @@ name: iOS E2E
 
 on:
   pull_request:
-    paths:
-      - '**/ios/**'  # Only if iOS files changed
 
 jobs:
-  e2e-ios:
-    if: github.event_name == 'pull_request' && contains(github.event.pull_request.changed_files, 'ios/')  # Extra condition
-    runs-on: macos-latest  # iOS needs macOS runner
+  detect-ios:
+    runs-on: ubuntu-latest   # IMPORTANT – queue issue को रोकता है
+    outputs:
+      ios: ${{ steps.filter.outputs.ios }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            ios:
+              - '**/ios/**'
+              - 'ios/**'
+
+  e2e-ios:
+    needs: detect-ios
+    if: needs.detect-ios.outputs.ios == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest
-      - name: Run E2E Tests
-        run: cd ios && xcodebuild test -scheme YourApp -destination 'platform=iOS Simulator,name=iPhone 15'  # Fail if E2E fails
+      - run: cd ios && xcodebuild test -scheme YourApp -destination "platform=iOS Simulator,name=iPhone 15"
