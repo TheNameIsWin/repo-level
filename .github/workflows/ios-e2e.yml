@@ -2,19 +2,61 @@ name: iOS E2E
 
 on:
   pull_request:
-    paths:
-      - '**/ios/**'  # Only if iOS files changed
 
 jobs:
-  e2e-ios:
-    if: github.event_name == 'pull_request' && contains(github.event.pull_request.changed_files, 'ios/')  # Extra condition
-    runs-on: macos-latest  # iOS needs macOS runner
+  ios-tests:
+    runs-on: macos-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest
-      - name: Run E2E Tests
-        run: cd ios && xcodebuild test -scheme YourApp -destination 'platform=iOS Simulator,name=iPhone 15'  # Fail if E2E fails
+      - uses: actions/checkout@v4
+
+      # Detect iOS changes
+      - name: Detect iOS changes
+        id: detect
+        run: |
+          CHANGED=$(git diff --name-only HEAD^ HEAD | grep -E '^ios/|/ios/' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      # *** MANUAL FAIL/PASS CONTROL ***
+      - name: Check for manual fail or pass trigger
+        id: control
+        run: |
+          MSG="${{ github.event.pull_request.title }} ${{ github.event.pull_request.body }}"
+          
+          if echo "$MSG" | grep -qi "fail-test"; then
+            echo "mode=fail" >> $GITHUB_OUTPUT
+          elif echo "$MSG" | grep -qi "pass-test"; then
+            echo "mode=pass" >> $GITHUB_OUTPUT
+          else
+            echo "mode=normal" >> $GITHUB_OUTPUT
+          fi
+
+      # If no iOS changes → PASS
+      - name: No iOS changes found — skipping tests
+        if: steps.detect.outputs.changed == 'false'
+        run: echo "No iOS files changed, skipping tests."
+
+      # If fail-test trigger is present → FORCE FAIL
+      - name: Force failure for testing
+        if: steps.control.outputs.mode == 'fail'
+        run: |
+          echo "Failing intentionally (fail-test trigger found)"
+          exit 1
+
+      # If pass-test trigger is present → FORCE PASS
+      - name: Force pass for testing
+        if: steps.control.outputs.mode == 'pass'
+        run: |
+          echo "Passing intentionally (pass-test trigger found)"
+
+      # Normal iOS Tests
+      - name: Run iOS Tests
+        if: steps.detect.outputs.changed == 'true' && steps.control.outputs.mode == 'normal'
+        run: |
+          cd ios
+          xcodebuild test \
+            -scheme YourApp \
+            -destination "platform=iOS Simulator,name=iPhone 15"
