@@ -2,20 +2,38 @@ name: Android Test
 
 on:
   pull_request:
-    paths:
-      - '**/android/**'  # Only if Android files changed
 
 jobs:
+  detect-android:
+    runs-on: ubuntu-latest
+    outputs:
+      android: ${{ steps.filter.outputs.android }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            android:
+              - '**/android/**'
+              - 'android/**'
+
   test-android:
-    if: github.event_name == 'pull_request' && contains(github.event.pull_request.changed_files, 'android/')  # Extra condition
+    needs: detect-android
+    if: needs.detect-android.outputs.android == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up JDK
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
         with:
+          distribution: temurin
           java-version: '17'
-          distribution: 'temurin'
-      - name: Run Unit Tests
-        run: cd android && ./gradlew test  # Fail if tests fail
+
+      - name: Run Android Unit Tests
+        run: |
+          cd android
+          ./gradlew test

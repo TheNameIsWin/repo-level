@@ -2,21 +2,43 @@ name: Web Deploy
 
 on:
   pull_request:
-    paths:
-      - '**/web/**'  # Only if Web files changed
 
 jobs:
+  detect-web:
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            web:
+              - '**/web/**'
+              - 'web/**'
+
   deploy-web:
-    if: github.event_name == 'pull_request' && contains(github.event.pull_request.changed_files, 'web/')  # Extra condition
+    needs: detect-web
+    if: needs.detect-web.outputs.web == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Install dependencies
-        run: cd web && npm ci
-      - name: Run Linting & Tests
-        run: cd web && npm run lint && npm test  # Fail on lint/test errors
+
+      - name: Install Web dependencies
+        run: |
+          cd web
+          npm ci
+
+      - name: Lint & Test Web
+        run: |
+          cd web
+          npm run lint
+          npm test
