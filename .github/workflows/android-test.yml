@@ -38,13 +38,6 @@ jobs:
         if: steps.detect.outputs.changed == 'false'
         run: echo "No Android files changed, skipping tests."
 
-      # Force fail
-      - name: Force failure
-        if: steps.control.outputs.mode == 'fail'
-        run: |
-          echo "Failing intentionally (fail-test)"
-          exit 1
-
       # Force pass
       - name: Force pass
         if: steps.control.outputs.mode == 'pass'
