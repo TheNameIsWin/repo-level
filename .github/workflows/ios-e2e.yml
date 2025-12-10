@@ -4,26 +4,33 @@ on:
   pull_request:
 
 jobs:
-  detect-ios:
-    runs-on: ubuntu-latest   # IMPORTANT – queue issue को रोकता है
-    outputs:
-      ios: ${{ steps.filter.outputs.ios }}
-    steps:
-      - id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            ios:
-              - '**/ios/**'
-              - 'ios/**'
-
-  e2e-ios:
-    needs: detect-ios
-    if: needs.detect-ios.outputs.ios == 'true'
+  ios-tests:
     runs-on: macos-latest
     steps:
+      # 1. Checkout
       - uses: actions/checkout@v4
-      - uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest
-      - run: cd ios && xcodebuild test -scheme YourApp -destination "platform=iOS Simulator,name=iPhone 15"
+
+      # 2. Detect changes manually (NO SKIP!)
+      - name: Detect iOS changes
+        id: detect
+        run: |
+          CHANGED=$(git diff --name-only HEAD^ HEAD | grep -E '^ios/|/ios/' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      # 3. If no changes → do not run test, just PASS
+      - name: No iOS changes found — skipping tests
+        if: steps.detect.outputs.changed == 'false'
+        run: echo "No iOS files changed, skipping tests."
+
+      # 4. RUN TEST ONLY WHEN CHANGED
+      - name: Run iOS Tests
+        if: steps.detect.outputs.changed == 'true'
+        run: |
+          cd ios
+          xcodebuild test \
+            -scheme YourApp \
+            -destination "platform=iOS Simulator,name=iPhone 15"
